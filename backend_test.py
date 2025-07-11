@@ -502,11 +502,10 @@ class AkshayaAPITester:
             print("❌ Authentication flow failed at OTP request")
             return
         
-        # Wait a moment and try with actual OTP from logs
+        # Wait a moment and get the actual OTP from logs
         time.sleep(1)
-        print("ℹ️  Using actual OTP from backend logs: '758685'...")
         
-        if not self.test_verify_otp("758685"):
+        if not self.test_verify_otp():
             print("❌ Authentication flow failed at OTP verification")
             return
         
