@@ -194,7 +194,7 @@ async def request_otp(request: OTPRequest):
     }
     
     # In production, send SMS here
-    print(f"OTP for {request.phone}: {otp}")
+    print(f"🔐 OTP for {request.phone}: {otp}")
     
     return AuthResponse(success=True, message="OTP sent successfully")
 
