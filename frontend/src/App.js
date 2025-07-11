@@ -220,8 +220,8 @@ const PhoneAuth = ({ onAuthSuccess }) => {
       if (response.ok) {
         setSuccess(t('otpSent'));
         setStep('otp');
-        // Auto-fill OTP in development (remove in production)
-        setTimeout(() => setOtp('123456'), 1000);
+        // Note: OTP is printed to backend console logs for testing
+        // In production, this would be sent via SMS
       } else {
         setError(data.detail || 'Failed to send OTP');
       }
