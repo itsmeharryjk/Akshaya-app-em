@@ -315,6 +315,13 @@ const PhoneAuth = ({ onAuthSuccess }) => {
           </div>
         ) : (
           <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">
+              <p className="text-sm">
+                <strong>Development Mode:</strong> Check the backend console logs for your OTP. 
+                In production, this would be sent to your phone via SMS.
+              </p>
+            </div>
+            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 {t('enterOTP')}
@@ -323,7 +330,7 @@ const PhoneAuth = ({ onAuthSuccess }) => {
                 type="text"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                placeholder="123456"
+                placeholder="Enter 6-digit OTP"
                 maxLength="6"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg tracking-wider"
               />
