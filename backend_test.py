@@ -68,8 +68,32 @@ class AkshayaAPITester:
         
         return False
     
-    def test_verify_otp(self, otp="123456"):
+    def get_latest_otp_from_logs(self):
+        """Extract the latest OTP from backend logs"""
+        try:
+            import subprocess
+            result = subprocess.run(['tail', '-n', '10', '/var/log/supervisor/backend.out.log'], 
+                                  capture_output=True, text=True)
+            lines = result.stdout.split('\n')
+            
+            # Look for OTP lines in reverse order (latest first)
+            for line in reversed(lines):
+                if f"OTP for {TEST_PHONE}:" in line:
+                    otp = line.split(': ')[-1].strip()
+                    return otp
+            return None
+        except:
+            return None
+    
+    def test_verify_otp(self, otp=None):
         """Test OTP verification endpoint"""
+        if otp is None:
+            otp = self.get_latest_otp_from_logs()
+            if not otp:
+                self.log_test("OTP Verification", False, "Could not extract OTP from logs")
+                return False
+            print(f"ℹ️  Using OTP from logs: {otp}")
+        
         try:
             response = self.session.post(
                 f"{BACKEND_URL}/auth/verify-otp",
