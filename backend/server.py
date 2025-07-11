@@ -107,7 +107,10 @@ def get_current_user(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid token format")
     
     token = authorization.split(" ")[1]
-    return token  # Return user_id for simplicity
+    # Extract user_id from token format "token_{user_id}"
+    if token.startswith("token_"):
+        return token[6:]  # Remove "token_" prefix to get user_id
+    return token  # Return as-is for backward compatibility
 
 # Services data
 SERVICES = [
