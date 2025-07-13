@@ -1,9 +1,11 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import secrets
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -12,6 +14,16 @@ from datetime import datetime, timedelta
 import json
 import random
 import string
+
+# Import production modules
+try:
+    from middleware.security import SecurityMiddleware, add_security_headers, configure_cors, configure_trusted_hosts
+    from monitoring.health import router as health_router
+    from services.sms import SMSService
+    PRODUCTION_MODULES_AVAILABLE = True
+except ImportError:
+    PRODUCTION_MODULES_AVAILABLE = False
+    print("⚠️  Production modules not available - running in development mode")
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -23,6 +35,35 @@ db = client[os.environ['DB_NAME']]
 
 # Create the main app without a prefix
 app = FastAPI()
+
+# Add session middleware with secure secret
+session_secret = os.getenv('JWT_SECRET', secrets.token_urlsafe(32))
+app.add_middleware(SessionMiddleware, secret_key=session_secret)
+
+# Configure security for production
+if PRODUCTION_MODULES_AVAILABLE and os.getenv('NODE_ENV') == 'production':
+    print("🔒 Configuring production security...")
+    add_security_headers(app)
+    configure_cors(app)
+    configure_trusted_hosts(app)
+    app.add_middleware(SecurityMiddleware)
+    
+    # Add health check endpoints
+    app.include_router(health_router, prefix="/api/health", tags=["health"])
+    
+    # Initialize SMS service
+    sms_service = SMSService()
+else:
+    print("🔧 Running in development mode...")
+    # Development CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_credentials=True,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    sms_service = None
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -97,6 +138,15 @@ otp_storage = {}
 
 def generate_otp():
     return ''.join(random.choices(string.digits, k=6))
+
+async def send_otp_via_sms(phone: str, otp: str) -> bool:
+    """Send OTP via SMS service"""
+    if sms_service:
+        return await sms_service.send_otp(phone, otp)
+    else:
+        # Development mode - just log
+        print(f"🔐 OTP for {phone}: {otp}")
+        return True
 
 def get_current_user(authorization: str = Header(None)):
     if not authorization:
@@ -194,7 +244,10 @@ async def request_otp(request: OTPRequest):
     }
     
     # In production, send SMS here
-    print(f"🔐 OTP for {request.phone}: {otp}")
+    sms_sent = await send_otp_via_sms(request.phone, otp)
+    
+    if not sms_sent:
+        raise HTTPException(status_code=500, detail="Failed to send OTP")
     
     return AuthResponse(success=True, message="OTP sent successfully")
 
@@ -414,20 +467,19 @@ async def root():
 # Include the router in the main app
 app.include_router(api_router)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Configure logging
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, log_level),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Log startup information
+logger.info(f"🚀 Akshaya E-Services API starting...")
+logger.info(f"📊 Environment: {os.getenv('NODE_ENV', 'development')}")
+logger.info(f"🔒 Security modules: {'enabled' if PRODUCTION_MODULES_AVAILABLE else 'disabled'}")
+logger.info(f"📱 SMS service: {'configured' if sms_service and sms_service.is_production else 'development mode'}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
